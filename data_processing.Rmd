@@ -1,0 +1,102 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+```{r}
+#giving the file location
+filedir = "/home/bharath/Desktop/CS 6001-Yanji Fu/20news-18828"
+
+#loading the raw document corpus
+input<- Corpus(DirSource(filedir, encoding = "UTF-8",recursive = TRUE),readerControl = list(reader = readPlain, language = "en"))
+
+#converting the entire document to lowercse
+input<- tm_map(input,tolower)
+
+#removing punctuations
+input<- tm_map(input,removePunctuation)
+
+#removing numbers as we are dealing with only numbers
+input<- tm_map(input,removeNumbers)
+
+#removing whitespaces from the document
+input<- tm_map(input,stripWhitespace)
+
+#removing stopwords from the document
+input<- tm_map(input, removeWords, stopwords(kind = "en"))
+
+#removing adverbs
+ladverb<- unlist(adverb,use.names = FALSE)
+
+#removing prepositions
+lpreposition<- unlist(preposition, use.names = FALSE)
+
+#iterating to remove adverbs since list of adverbs too large
+chunk <- 1000
+i <- 0
+n <- length(ladverb)
+while (i != n) {
+    i2 <- min(i + chunk, n)
+    corpus <- tm_map(input, removeWords, ladverb[(i+1):i2])
+    i <- i2
+}
+
+#iterating to remove prepositions
+chunk <- 1000
+i <- 0
+n <- length(lpreposition)
+while (i != n) {
+    i2 <- min(i + chunk, n)
+    corpus <- tm_map(input, removeWords, lpreposition[(i+1):i2])
+    i <- i2
+}
+
+#converting to document term matrix
+tdm<- DocumentTermMatrix(corpus)
+#removing sparse terms to reduce file size
+tdm_sparse<- removeSparseTerms(tdm, 0.99)
+
+#since we want the top 100 words as features these are the 100 words with highest frequency. This is gotfrom finding the most frequent words in the matrix below 
+col_names<- findFreqTerms(tdm_sparse, lowfreq = 2266, highfreq = 20334)
+col_names_1<- findFreqTerms(tdm_sparse, lowfreq = 5339, highfreq = 20334)
+#converting tf matrix to matrix of size 18828 x 1651
+tdm_sparse<- weightTfIdf(tdm_sparse)
+tdm_matrix<- as.matrix(tdm_sparse, rownames.force = TRUE)
+
+#find the words in the matrix in a decreasing order
+freq_words<- sort(colSums(tdm_matrix), decreasing = TRUE)
+
+#finding the top 100
+top_100<- (head(freq_words,100))
+top_20<- (head(freq_words,20))
+
+top_100_matrix<- as.matrix(top_100) # converting top 100 features to a matrix
+top_20_matrix<- as.matrix(top_20)
+#converting matrix to data frame
+x<- data.frame(tdm_matrix)
+
+#resizing the data frame to contain onlt the top 100 words which means the size of the data frame is now 18828 x 100
+y<- x[,col_names]
+z<- x[,col_names_1]
+#converting data frame to matrix
+y<- as.matrix(y)
+z<- as.matrix(z)
+write.csv(tdm_matrix, "full_matrix.csv")
+write.csv(top_100,"top100.csv") # writing top 100 words to csv
+write.csv(y, "finamatrix.csv") # writing the 18828 x 100 to csv
+write.csv(z, "top_20.csv")
+```
+
+
+
